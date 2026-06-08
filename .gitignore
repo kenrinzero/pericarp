@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+*.log
+pericarp-session-*.md
+pericarp-template*.txt
+electron.zip

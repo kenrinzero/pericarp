@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Pericarp</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  
+  <!-- Pre-Session Startup Screen -->
+  <div id="startup-container">
+    <div id="header">
+      <h1>Pericarp</h1>
+      <p>Browsing requires a plan.</p>
+    </div>
+
+    <div id="setup-form">
+      <div id="allowlist-container">
+        <!-- Dynamic inputs will go here -->
+      </div>
+      
+      <p id="cap-warning" class="hidden">
+        15 entries is the limit for one session. If you need more, consider whether this is actually two sessions.
+      </p>
+
+      <div id="duration-container">
+        <label for="duration-input">Optional Timer (minutes):</label>
+        <input type="number" id="duration-input" min="1" placeholder="e.g. 30">
+      </div>
+
+      <div id="template-actions">
+        <button id="import-template-btn">Import Template</button>
+        <button id="save-template-btn">Save as Template</button>
+      </div>
+
+      <button id="start-btn">Start Session</button>
+    </div>
+  </div>
+
+  <!-- In-Session Sidebar Shell -->
+  <div id="session-shell" class="hidden">
+    <div id="time-up-banner" class="hidden">
+      <span>Your planned session time is up.</span>
+      <button id="dismiss-banner-btn">Dismiss</button>
+    </div>
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <span class="title">Allowed</span>
+        <button id="toggle-sidebar-btn" title="Toggle side">⇋</button>
+      </div>
+      <ul id="sidebar-list"></ul>
+      <div id="sidebar-notifications"></div>
+    </div>
+  </div>
+
+  <!-- Session Summary Overlay -->
+  <div id="summary-overlay" class="hidden">
+    <div class="summary-box">
+      <h2>Session Complete</h2>
+      <p id="summary-stats"></p>
+      <div class="summary-actions">
+        <button id="export-close-btn">Export Log & Close</button>
+        <button id="force-close-btn">Discard</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

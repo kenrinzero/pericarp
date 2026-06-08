@@ -1,0 +1,19 @@
+{
+  "name": "pericarp",
+  "version": "1.0.0",
+  "description": "Sealed, allowlist-only mini browser",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^34.3.1"
+  },
+  "allowScripts": {
+    "electron@34.3.1": true
+  }
+}
