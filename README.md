@@ -25,10 +25,18 @@ A distraction-limiting mini browser for self-use. The app is a temporary, sealed
 
 ## Setup & Run
 
-```bash
-npm install
-npm start
-```
+Pericarp requires [Node.js](https://nodejs.org/) to run.
+
+1. Clone or download this repository.
+2. Open your terminal in the project directory.
+3. Install the required dependencies:
+   ```bash
+   npm install
+   ```
+4. Launch the application:
+   ```bash
+   npm start
+   ```
 
 ## Shortcuts
 - `Cmd/Ctrl + Shift + P`: Global quick-launch hotkey to summon Pericarp.
