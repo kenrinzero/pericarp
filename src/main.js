@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, WebContentsView, session, dialog, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { isAllowed } = require('./allowlist');
 
 let mainWindow;
 let sess;
@@ -78,27 +79,6 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Helper: Check if URL is allowed
-function isAllowed(urlStr, allowlist) {
-  try {
-    const url = new URL(urlStr);
-    if (!['http:', 'https:'].includes(url.protocol)) return true;
-    const domainAndPath = url.host + url.pathname;
-    return allowlist.some(entry => {
-      const cleanEntry = entry.replace(/^https?:\/\//, '');
-      if (cleanEntry.includes('*')) {
-        const escaped = cleanEntry.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-        const regexStr = '^' + escaped.replace(/\\\*/g, '.*');
-        return new RegExp(regexStr).test(domainAndPath);
-      }
-      if (cleanEntry.includes('/')) return domainAndPath.startsWith(cleanEntry);
-      return url.host === cleanEntry;
-    });
-  } catch (e) {
-    return false;
-  }
-}
-
 function resizeViews() {
   if (!mainWindow || !views[activeViewIndex]) return;
   const [contentWidth, contentHeight] = mainWindow.getContentSize();
@@ -142,7 +122,11 @@ ipcMain.on('start-session', (event, payload) => {
 
   sess.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
     if (details.resourceType === 'mainFrame' || details.resourceType === 'subFrame') {
-      if (!isAllowed(details.url, allowlist)) {
+      try {
+        if (!isAllowed(new URL(details.url), allowlist)) {
+          return callback({ cancel: true });
+        }
+      } catch (e) {
         return callback({ cancel: true });
       }
     }
@@ -162,13 +146,31 @@ ipcMain.on('start-session', (event, payload) => {
       return { action: 'deny' };
     });
 
-    view.webContents.on('will-redirect', (e, url) => {
-      if (!isAllowed(url, allowlist)) {
-        e.preventDefault();
-        sessionLog.redirects.push({ timestamp: Date.now(), url });
-        if (mainWindow) {
-          mainWindow.webContents.send('redirect-blocked', url);
+    view.webContents.on('will-navigate', (e, url) => {
+      try {
+        if (!isAllowed(new URL(url), allowlist)) {
+          e.preventDefault();
+          sessionLog.redirects.push({ timestamp: Date.now(), url });
+          if (mainWindow) {
+            mainWindow.webContents.send('redirect-blocked', url);
+          }
         }
+      } catch (err) {
+        e.preventDefault();
+      }
+    });
+
+    view.webContents.on('will-redirect', (e, url) => {
+      try {
+        if (!isAllowed(new URL(url), allowlist)) {
+          e.preventDefault();
+          sessionLog.redirects.push({ timestamp: Date.now(), url });
+          if (mainWindow) {
+            mainWindow.webContents.send('redirect-blocked', url);
+          }
+        }
+      } catch (err) {
+        e.preventDefault();
       }
     });
 
@@ -194,6 +196,15 @@ ipcMain.on('start-session', (event, payload) => {
     const logNav = (e, url) => { sessionLog.visited.push({ timestamp: Date.now(), url }); };
     view.webContents.on('did-navigate', logNav);
     view.webContents.on('did-navigate-in-page', logNav);
+
+    view.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+      // Ignore aborts (e.g. from will-navigate/preventDefault) and subframes
+      if (errorCode === -3 || !event.isMainFrame) return;
+      view.webContents.loadURL(`data:text/html,${encodeURIComponent(
+        `<html><body style="background:#171615;color:#888;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">` +
+        `<p>Failed to load page.<br>${errorDescription} (${errorCode})</p></body></html>`
+      )}`);
+    });
 
     const startUrl = entry.startsWith('http') ? entry : `https://${entry}`;
     view.webContents.loadURL(startUrl);

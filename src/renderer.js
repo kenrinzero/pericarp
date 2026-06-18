@@ -169,7 +169,27 @@ const summaryOverlay = document.getElementById('summary-overlay');
 const summaryStats = document.getElementById('summary-stats');
 
 window.electronAPI.onShowSummary((stats) => {
-  summaryStats.innerHTML = `You stayed focused for <strong>${stats.duration} minutes</strong>.<br>Pericarp blocked <strong>${stats.blocked}</strong> distracting clicks and <strong>${stats.redirects}</strong> off-site redirects.`;
+  summaryStats.textContent = '';
+  const line1 = document.createElement('span');
+  line1.textContent = 'You stayed focused for ';
+  const dur = document.createElement('strong');
+  dur.textContent = `${stats.duration} minutes`;
+  line1.appendChild(dur);
+  line1.appendChild(document.createTextNode('.'));
+  const line2 = document.createElement('br');
+  const line3 = document.createElement('span');
+  line3.textContent = 'Pericarp blocked ';
+  const blocked = document.createElement('strong');
+  blocked.textContent = `${stats.blocked} distracting clicks`;
+  line3.appendChild(blocked);
+  line3.appendChild(document.createTextNode(' and '));
+  const redirects = document.createElement('strong');
+  redirects.textContent = `${stats.redirects} off-site redirects`;
+  line3.appendChild(redirects);
+  line3.appendChild(document.createTextNode('.'));
+  summaryStats.appendChild(line1);
+  summaryStats.appendChild(line2);
+  summaryStats.appendChild(line3);
   summaryOverlay.classList.remove('hidden');
 });
 

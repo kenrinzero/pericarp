@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { isAllowed } = require('./allowlist');
 
 let allowlist = [];
 const arg = process.argv.find(a => a.startsWith('--allowlist='));
@@ -6,26 +7,6 @@ if (arg) {
   try {
     allowlist = JSON.parse(arg.substring('--allowlist='.length));
   } catch (e) {}
-}
-
-function isAllowed(urlStr) {
-  try {
-    const url = new URL(urlStr, window.location.href);
-    if (!['http:', 'https:'].includes(url.protocol)) return true; 
-    const domainAndPath = url.host + url.pathname;
-    return allowlist.some(entry => {
-      const cleanEntry = entry.replace(/^https?:\/\//, '');
-      if (cleanEntry.includes('*')) {
-        const escaped = cleanEntry.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
-        const regexStr = '^' + escaped.replace(/\\\*/g, '.*');
-        return new RegExp(regexStr).test(domainAndPath);
-      }
-      if (cleanEntry.includes('/')) return domainAndPath.startsWith(cleanEntry);
-      return url.host === cleanEntry;
-    });
-  } catch (e) {
-    return false;
-  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {
@@ -45,9 +26,19 @@ window.addEventListener('DOMContentLoaded', () => {
       if (a.hasAttribute('data-pericarp-blocked')) return;
       if (!a.href) return;
       
-      if (!isAllowed(a.href)) {
+      try {
+        if (!isAllowed(new URL(a.href, window.location.href), allowlist)) {
+          a.setAttribute('data-pericarp-blocked', 'true');
+          a.title = 'Blocked by Pericarp allowlist';
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            ipcRenderer.send('log-inert-click', a.href);
+          });
+        }
+      } catch (e) {
+        // Malformed URL — block it
         a.setAttribute('data-pericarp-blocked', 'true');
-        a.title = 'Blocked by Pericarp allowlist';
         a.addEventListener('click', (e) => {
           e.preventDefault();
           e.stopPropagation();
