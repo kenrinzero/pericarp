@@ -6,7 +6,9 @@ const arg = process.argv.find(a => a.startsWith('--allowlist='));
 if (arg) {
   try {
     allowlist = JSON.parse(arg.substring('--allowlist='.length));
-  } catch (e) {}
+  } catch (e) {
+    console.warn('Pericarp: failed to parse --allowlist argument', e);
+  }
 }
 
 window.addEventListener('DOMContentLoaded', () => {

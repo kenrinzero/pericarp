@@ -4,14 +4,19 @@
   "description": "Sealed, allowlist-only mini browser",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
   "license": "MIT",
   "type": "commonjs",
+  "jest": {
+    "testEnvironment": "node"
+  },
   "devDependencies": {
-    "electron": "^34.3.1"
+    "electron": "^34.3.1",
+    "jest": "^29.7.0"
   },
   "allowScripts": {
     "electron@34.3.1": true

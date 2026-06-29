@@ -7,6 +7,7 @@ A distraction-limiting mini browser for self-use. The app is a temporary, sealed
 ## Built with assistance from
 - Antigravity IDE (Gemini 3.1 Pro)
 - ZCode (GLM-5-Turbo)
+- Claude Code (Claude Sonnet 4.6)
 
 ## Stack
 

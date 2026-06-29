@@ -3,7 +3,7 @@
 
 function matchesEntry(domainAndPath, cleanEntry) {
   if (cleanEntry.includes('*')) {
-    const escaped = cleanEntry.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = cleanEntry.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regexStr = '^' + escaped.replace(/\\\*/g, '.*');
     return new RegExp(regexStr).test(domainAndPath);
   }

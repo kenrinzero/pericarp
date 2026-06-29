@@ -1,8 +1,8 @@
 const MAX_ENTRIES = 15;
+const TOAST_DURATION_MS = 4000;
 const container = document.getElementById('allowlist-container');
 const warning = document.getElementById('cap-warning');
 
-// Setup UI
 addInput();
 
 function addInput() {
@@ -31,7 +31,6 @@ function handleInput(e) {
   }
 }
 
-// Start Session
 document.getElementById('start-btn').addEventListener('click', () => {
   const inputs = Array.from(container.querySelectorAll('.allowlist-input'));
   const allowlist = inputs.map(input => input.value.trim()).filter(val => val !== '');
@@ -42,18 +41,16 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
   window.electronAPI.startSession({ allowlist, duration });
 
-  // Transition UI to Sidebar Shell
   document.getElementById('startup-container').classList.add('hidden');
   document.getElementById('session-shell').classList.remove('hidden');
-  
+
   renderSidebar(allowlist);
 });
 
-// Template Actions
 function populateFromTemplate(result) {
   container.innerHTML = '';
   warning.classList.add('hidden');
-  
+
   result.allowlist.forEach(entry => {
     if (container.querySelectorAll('.allowlist-input').length >= MAX_ENTRIES) return;
     const input = document.createElement('input');
@@ -63,7 +60,7 @@ function populateFromTemplate(result) {
     input.addEventListener('input', handleInput);
     container.appendChild(input);
   });
-  
+
   if (container.querySelectorAll('.allowlist-input').length < MAX_ENTRIES) {
     addInput();
   } else {
@@ -80,7 +77,6 @@ document.getElementById('import-template-btn').addEventListener('click', async (
   if (result) populateFromTemplate(result);
 });
 
-// Drag and Drop Templates
 const startupContainer = document.getElementById('startup-container');
 startupContainer.addEventListener('dragover', (e) => {
   e.preventDefault();
@@ -102,13 +98,12 @@ document.getElementById('save-template-btn').addEventListener('click', async () 
   const allowlist = inputs.map(input => input.value.trim()).filter(val => val !== '');
   const durationStr = document.getElementById('duration-input').value.trim();
   const duration = durationStr ? parseInt(durationStr, 10) : null;
-  
+
   if (allowlist.length === 0) return;
-  
+
   await window.electronAPI.saveTemplate({ allowlist, duration });
 });
 
-// Sidebar Logic
 let sidebarPosition = 'left';
 const listEl = document.getElementById('sidebar-list');
 
@@ -117,7 +112,7 @@ function renderSidebar(allowlist) {
     const li = document.createElement('li');
     li.textContent = entry;
     if (index === 0) li.classList.add('active');
-    
+
     li.addEventListener('click', (e) => {
       if (e.shiftKey) {
         li.classList.add('split-active');
@@ -131,7 +126,7 @@ function renderSidebar(allowlist) {
         window.electronAPI.switchView(index);
       }
     });
-    
+
     listEl.appendChild(li);
   });
 }
@@ -152,10 +147,9 @@ window.electronAPI.onRedirectBlocked((url) => {
   toast.className = 'toast';
   toast.innerText = `Redirect Blocked:\n${url}`;
   notifArea.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  setTimeout(() => toast.remove(), TOAST_DURATION_MS);
 });
 
-// Timer Banner
 const banner = document.getElementById('time-up-banner');
 window.electronAPI.onSessionTimeUp(() => {
   banner.classList.remove('hidden');
@@ -164,7 +158,6 @@ document.getElementById('dismiss-banner-btn').addEventListener('click', () => {
   banner.classList.add('hidden');
 });
 
-// Summary Overlay
 const summaryOverlay = document.getElementById('summary-overlay');
 const summaryStats = document.getElementById('summary-stats');
 

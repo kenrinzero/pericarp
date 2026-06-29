@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, WebContentsView, session, dialog, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, WebContentsView, session, dialog, globalShortcut, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { isAllowed } = require('./allowlist');
@@ -30,18 +30,17 @@ function createWindow() {
     resizeViews();
   });
 
-  // Stage 3: Window Close Interception for Export
   mainWindow.on('close', (e) => {
     if (sessionLog && sessionLog.startTime) {
-      e.preventDefault(); // Pause the close
-      
+      e.preventDefault();
+
       const durationMinutes = Math.round((Date.now() - sessionLog.startTime) / 60000);
       const stats = {
         duration: durationMinutes,
         blocked: sessionLog.blockedClicks.length,
         redirects: sessionLog.redirects.length
       };
-      
+
       mainWindow.webContents.send('show-summary', stats);
     }
   });
@@ -60,7 +59,7 @@ app.whenReady().then(() => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
-  
+
   globalShortcut.register('CommandOrControl+Shift+P', () => {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -84,7 +83,7 @@ function resizeViews() {
   const [contentWidth, contentHeight] = mainWindow.getContentSize();
   const viewWidth = contentWidth - SIDEBAR_WIDTH;
   const x = sidebarPos === 'left' ? SIDEBAR_WIDTH : 0;
-  
+
   if (secondaryViewIndex !== null && views[secondaryViewIndex]) {
     const halfWidth = Math.floor(viewWidth / 2);
     views[activeViewIndex].setBounds({ x, y: 0, width: halfWidth, height: contentHeight });
@@ -94,11 +93,9 @@ function resizeViews() {
   }
 }
 
-// Initialize Session
 ipcMain.on('start-session', (event, payload) => {
   const allowlist = payload.allowlist;
-  
-  // Stage 3: Initialize Session Log state
+
   sessionLog = {
     startTime: Date.now(),
     allowlist: allowlist,
@@ -108,7 +105,6 @@ ipcMain.on('start-session', (event, payload) => {
     redirects: []
   };
 
-  // Create in-memory session
   sess = session.fromPartition('in-memory', { cache: false });
   sess.clearStorageData();
 
@@ -133,6 +129,18 @@ ipcMain.on('start-session', (event, payload) => {
     callback({ cancel: false });
   });
 
+  const handleNavBlock = (e, url) => {
+    try {
+      if (!isAllowed(new URL(url), allowlist)) {
+        e.preventDefault();
+        sessionLog.redirects.push({ timestamp: Date.now(), url });
+        if (mainWindow) mainWindow.webContents.send('redirect-blocked', url);
+      }
+    } catch (err) {
+      e.preventDefault();
+    }
+  };
+
   allowlist.forEach((entry, index) => {
     const view = new WebContentsView({
       session: sess,
@@ -146,33 +154,8 @@ ipcMain.on('start-session', (event, payload) => {
       return { action: 'deny' };
     });
 
-    view.webContents.on('will-navigate', (e, url) => {
-      try {
-        if (!isAllowed(new URL(url), allowlist)) {
-          e.preventDefault();
-          sessionLog.redirects.push({ timestamp: Date.now(), url });
-          if (mainWindow) {
-            mainWindow.webContents.send('redirect-blocked', url);
-          }
-        }
-      } catch (err) {
-        e.preventDefault();
-      }
-    });
-
-    view.webContents.on('will-redirect', (e, url) => {
-      try {
-        if (!isAllowed(new URL(url), allowlist)) {
-          e.preventDefault();
-          sessionLog.redirects.push({ timestamp: Date.now(), url });
-          if (mainWindow) {
-            mainWindow.webContents.send('redirect-blocked', url);
-          }
-        }
-      } catch (err) {
-        e.preventDefault();
-      }
-    });
+    view.webContents.on('will-navigate', handleNavBlock);
+    view.webContents.on('will-redirect', handleNavBlock);
 
     view.webContents.on('before-input-event', (event, input) => {
       if (input.type === 'keyDown') {
@@ -192,7 +175,6 @@ ipcMain.on('start-session', (event, payload) => {
       }
     });
 
-    // Stage 3: Log URL visits
     const logNav = (e, url) => { sessionLog.visited.push({ timestamp: Date.now(), url }); };
     view.webContents.on('did-navigate', logNav);
     view.webContents.on('did-navigate-in-page', logNav);
@@ -219,14 +201,14 @@ ipcMain.on('start-session', (event, payload) => {
 
 ipcMain.on('switch-view', (event, index) => {
   if (index === activeViewIndex || !views[index]) return;
-  
+
   if (views[activeViewIndex]) {
     mainWindow.contentView.removeChildView(views[activeViewIndex]);
   }
   if (secondaryViewIndex !== null && views[secondaryViewIndex]) {
     mainWindow.contentView.removeChildView(views[secondaryViewIndex]);
   }
-  
+
   activeViewIndex = index;
   secondaryViewIndex = null;
   mainWindow.contentView.addChildView(views[activeViewIndex]);
@@ -235,11 +217,11 @@ ipcMain.on('switch-view', (event, index) => {
 
 ipcMain.on('split-view', (event, index) => {
   if (index === activeViewIndex || !views[index] || index === secondaryViewIndex) return;
-  
+
   if (secondaryViewIndex !== null && views[secondaryViewIndex]) {
     mainWindow.contentView.removeChildView(views[secondaryViewIndex]);
   }
-  
+
   secondaryViewIndex = index;
   mainWindow.contentView.addChildView(views[secondaryViewIndex]);
   resizeViews();
@@ -250,20 +232,18 @@ ipcMain.on('toggle-sidebar', (event, pos) => {
   resizeViews();
 });
 
-// Stage 3: Log inert clicks from preload
 ipcMain.on('log-inert-click', (event, url) => {
   if (sessionLog) {
     sessionLog.blockedClicks.push({ timestamp: Date.now(), url });
   }
 });
 
-// Stage 4: Templates
 function parseTemplate(filePath) {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     let allowlist = [];
     let duration = null;
-    
+
     if (filePath.endsWith('.md')) {
       let inAllowlist = false;
       const lines = content.split('\n');
@@ -277,7 +257,7 @@ function parseTemplate(filePath) {
         } else if (inAllowlist && line.startsWith('##')) {
           inAllowlist = false;
         }
-        
+
         const durationMatch = line.match(/\*\*Planned Duration:\*\*\s*(\d+)/);
         if (durationMatch) {
           duration = parseInt(durationMatch[1], 10);
@@ -297,31 +277,32 @@ function parseTemplate(filePath) {
     }
     return { allowlist, duration };
   } catch (e) {
+    console.warn('Pericarp: failed to read template:', e);
     return null;
   }
 }
 
-ipcMain.handle('import-template', async () => {
+ipcMain.handle('import-template', () => {
   const result = dialog.showOpenDialogSync(mainWindow, {
     title: 'Import Template',
     filters: [{ name: 'Templates or Logs', extensions: ['txt', 'md'] }]
   });
-  
+
   if (!result || result.length === 0) return null;
   return parseTemplate(result[0]);
 });
 
-ipcMain.handle('parse-template-file', async (event, filePath) => {
+ipcMain.handle('parse-template-file', (event, filePath) => {
   return parseTemplate(filePath);
 });
 
-ipcMain.handle('save-template', async (event, payload) => {
+ipcMain.handle('save-template', (event, payload) => {
   const savePath = dialog.showSaveDialogSync(mainWindow, {
     title: 'Save Template',
     defaultPath: `pericarp-template.txt`,
     filters: [{ name: 'Text', extensions: ['txt'] }]
   });
-  
+
   if (savePath) {
     let content = `# Pericarp Template\n`;
     if (payload.duration) {
@@ -329,18 +310,22 @@ ipcMain.handle('save-template', async (event, payload) => {
     }
     content += `\n`;
     payload.allowlist.forEach(item => content += `${item}\n`);
-    fs.writeFileSync(savePath, content, 'utf-8');
+    try {
+      fs.writeFileSync(savePath, content, 'utf-8');
+    } catch (err) {
+      console.error('Pericarp: failed to write template:', err);
+      return false;
+    }
     return true;
   }
   return false;
 });
 
-// Summary Overlay Close actions
 ipcMain.on('export-and-close', (event) => {
   if (sessionLog) {
     sessionLog.endTime = Date.now();
     const durationMinutes = Math.round((sessionLog.endTime - sessionLog.startTime) / 60000);
-    
+
     let md = `# Pericarp Session Log\n\n`;
     md += `**Date:** ${new Date(sessionLog.startTime).toLocaleString()}\n`;
     md += `**Duration:** ${durationMinutes} minutes\n`;
@@ -349,29 +334,33 @@ ipcMain.on('export-and-close', (event) => {
     }
     md += `\n## Allowlist\n`;
     sessionLog.allowlist.forEach(item => md += `- ${item}\n`);
-    
+
     md += `\n## Visited Pages\n`;
     sessionLog.visited.forEach(v => md += `- [${new Date(v.timestamp).toLocaleTimeString()}] ${v.url}\n`);
-    
+
     md += `\n## Blocked Clicks\n`;
     sessionLog.blockedClicks.forEach(b => md += `- [${new Date(b.timestamp).toLocaleTimeString()}] ${b.url}\n`);
-    
+
     md += `\n## Redirects Blocked\n`;
     sessionLog.redirects.forEach(r => md += `- [${new Date(r.timestamp).toLocaleTimeString()}] ${r.url}\n`);
-    
+
     const savePath = dialog.showSaveDialogSync(mainWindow, {
       title: 'Save Session Log',
       defaultPath: `pericarp-session-${Date.now()}.md`,
       filters: [{ name: 'Markdown', extensions: ['md'] }, { name: 'Text', extensions: ['txt'] }]
     });
-    
+
     if (savePath) {
-      fs.writeFileSync(savePath, md, 'utf-8');
-      require('electron').shell.openPath(savePath);
+      try {
+        fs.writeFileSync(savePath, md, 'utf-8');
+        shell.openPath(savePath);
+      } catch (err) {
+        console.error('Pericarp: failed to write session log:', err);
+      }
     }
   }
-  
-  sessionLog = null; 
+
+  sessionLog = null;
   if (mainWindow) mainWindow.destroy();
 });
 
